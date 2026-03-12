@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SentimentScope — Twitter Sentiment Analyzer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #080c14;
+      --surface: #0f1521;
+      --surface2: #161e2e;
+      --border: rgba(255,255,255,0.07);
+      --positive: #00d4aa;
+      --negative: #ff4d6d;
+      --neutral: #ffd166;
+      --accent: #4f8ef7;
+      --text: #e8edf5;
+      --muted: #6b7a99;
+      --glow-pos: rgba(0,212,170,0.15);
+      --glow-neg: rgba(255,77,109,0.15);
+      --glow-acc: rgba(79,142,247,0.2);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Background Grid ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(79,142,247,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(79,142,247,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Header ── */
+    header {
+      position: relative;
+      z-index: 10;
+      padding: 2.5rem 3rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .logo-icon {
+      width: 38px; height: 38px;
+      background: linear-gradient(135deg, var(--accent), var(--positive));
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem;
+    }
+
+    .logo-text {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.4rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .logo-text span { color: var(--accent); }
+
+    .badge {
+      background: rgba(79,142,247,0.12);
+      border: 1px solid rgba(79,142,247,0.25);
+      color: var(--accent);
+      font-size: 0.72rem;
+      font-weight: 500;
+      padding: 0.3rem 0.8rem;
+      border-radius: 20px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    /* ── Main Layout ── */
+    main {
+      position: relative;
+      z-index: 5;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 3rem 2rem;
+    }
+
+    /* ── Hero ── */
+    .hero {
+      text-align: center;
+      margin-bottom: 3.5rem;
+      animation: fadeUp 0.7s ease both;
+    }
+
+    .hero h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(2.2rem, 5vw, 3.8rem);
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+      margin-bottom: 1rem;
+    }
+
+    .hero h1 em {
+      font-style: normal;
+      background: linear-gradient(90deg, var(--positive), var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero p {
+      color: var(--muted);
+      font-size: 1.05rem;
+      max-width: 540px;
+      margin: 0 auto;
+      line-height: 1.7;
+    }
+
+    /* ── Input Panel ── */
+    .input-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 2rem;
+      margin-bottom: 2.5rem;
+      animation: fadeUp 0.7s 0.1s ease both;
+    }
+
+    .input-label {
+      font-family: 'Syne', sans-serif;
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 1rem;
+      display: block;
+    }
+
+    /* Topic Pills */
+    .topics {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      margin-bottom: 1.8rem;
+    }
+
+    .topic-pill {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 0.5rem 1.1rem;
+      border-radius: 50px;
+      font-size: 0.88rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .topic-pill:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(79,142,247,0.08);
+    }
+
+    .topic-pill.active {
+      background: rgba(79,142,247,0.15);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Divider */
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin: 1.5rem 0;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* Custom Input */
+    .custom-area {
+      position: relative;
+    }
+
+    textarea {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.95rem;
+      padding: 1rem 1.2rem;
+      resize: vertical;
+      min-height: 100px;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+
+    textarea:focus { border-color: var(--accent); }
+    textarea::placeholder { color: var(--muted); }
+
+    .hint {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 0.5rem;
+    }
+
+    /* Analyze Button */
+    .btn-analyze {
+      margin-top: 1.5rem;
+      width: 100%;
+      padding: 1rem;
+      background: linear-gradient(135deg, var(--accent), #6fa8ff);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-family: 'Syne', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      transition: all 0.25s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-analyze:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 30px rgba(79,142,247,0.35);
+    }
+
+    .btn-analyze:active { transform: translateY(0); }
+
+    .btn-analyze.loading { opacity: 0.7; cursor: wait; }
+
+    /* ── Results Section ── */
+    #results { display: none; animation: fadeUp 0.5s ease both; }
+
+    /* Summary Cards */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.3rem;
+      text-align: center;
+      transition: transform 0.2s;
+    }
+
+    .stat-card:hover { transform: translateY(-3px); }
+
+    .stat-card.positive { border-color: rgba(0,212,170,0.3); background: rgba(0,212,170,0.05); }
+    .stat-card.negative { border-color: rgba(255,77,109,0.3); background: rgba(255,77,109,0.05); }
+    .stat-card.neutral  { border-color: rgba(255,209,102,0.3); background: rgba(255,209,102,0.05); }
+    .stat-card.overall  { border-color: rgba(79,142,247,0.3); background: rgba(79,142,247,0.05); }
+
+    .stat-value {
+      font-family: 'Syne', sans-serif;
+      font-size: 2rem;
+      font-weight: 800;
+      line-height: 1;
+      margin-bottom: 0.3rem;
+    }
+
+    .stat-card.positive .stat-value { color: var(--positive); }
+    .stat-card.negative .stat-value { color: var(--negative); }
+    .stat-card.neutral  .stat-value { color: var(--neutral); }
+    .stat-card.overall  .stat-value { color: var(--accent); font-size: 1.1rem; }
+
+    .stat-label {
+      font-size: 0.78rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 500;
+    }
+
+    /* Bar Chart */
+    .chart-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem 2rem;
+      margin-bottom: 2rem;
+    }
+
+    .chart-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 1.2rem;
+    }
+
+    .bar-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 0.9rem;
+    }
+
+    .bar-label {
+      width: 70px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    .bar-track {
+      flex: 1;
+      height: 10px;
+      background: var(--surface2);
+      border-radius: 20px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 20px;
+      width: 0;
+      transition: width 1s cubic-bezier(0.23, 1, 0.32, 1);
+    }
+
+    .bar-pct {
+      width: 45px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    /* Tweet Cards */
+    .tweets-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.2rem;
+    }
+
+    .tweets-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 700;
+    }
+
+    .btn-export {
+      background: rgba(0,212,170,0.1);
+      border: 1px solid rgba(0,212,170,0.3);
+      color: var(--positive);
+      padding: 0.5rem 1.1rem;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    .btn-export:hover {
+      background: rgba(0,212,170,0.2);
+      transform: translateY(-1px);
+    }
+
+    /* Filter Tabs */
+    .filter-tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.2rem;
+    }
+
+    .filter-tab {
+      padding: 0.4rem 0.9rem;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      transition: all 0.2s;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    .filter-tab:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+    .filter-tab.active { background: var(--surface2); color: var(--text); border-color: rgba(255,255,255,0.2); }
+
+    /* Tweet List */
+    .tweet-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.8rem;
+    }
+
+    .tweet-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid;
+      border-radius: 12px;
+      padding: 1rem 1.3rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      transition: all 0.2s;
+      animation: slideIn 0.4s ease both;
+    }
+
+    .tweet-card:hover {
+      transform: translateX(4px);
+      background: var(--surface2);
+    }
+
+    .tweet-card.Positive { border-left-color: var(--positive); }
+    .tweet-card.Negative { border-left-color: var(--negative); }
+    .tweet-card.Neutral  { border-left-color: var(--neutral); }
+
+    .tweet-emoji { font-size: 1.4rem; flex-shrink: 0; line-height: 1.4; }
+
+    .tweet-content { flex: 1; }
+
+    .tweet-text {
+      font-size: 0.92rem;
+      line-height: 1.6;
+      margin-bottom: 0.5rem;
+      color: var(--text);
+    }
+
+    .tweet-meta {
+      display: flex;
+      gap: 1rem;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    .tweet-polarity {
+      font-weight: 600;
+    }
+
+    .polarity-pos { color: var(--positive); }
+    .polarity-neg { color: var(--negative); }
+    .polarity-neu { color: var(--neutral); }
+
+    /* Polarity Meter */
+    .polarity-meter {
+      width: 80px;
+      flex-shrink: 0;
+      text-align: center;
+    }
+
+    .meter-track {
+      height: 4px;
+      background: var(--surface2);
+      border-radius: 4px;
+      margin-top: 0.4rem;
+      overflow: hidden;
+    }
+
+    .meter-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.8s ease;
+    }
+
+    /* Loading Spinner */
+    .spinner {
+      display: inline-block;
+      width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--muted);
+      font-size: 0.8rem;
+      border-top: 1px solid var(--border);
+      position: relative;
+      z-index: 5;
+    }
+
+    /* Animations */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(-10px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Responsive */
+    @media (max-width: 640px) {
+      header { padding: 1.5rem; }
+      main { padding: 2rem 1rem; }
+      .summary-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🔬</div>
+      <div class="logo-text">Sentiment<span>Scope</span></div>
+    </div>
+    <div class="badge">AI Powered · NLP</div>
+  </header>
+
+  <main>
+    <!-- Hero -->
+    <div class="hero">
+      <h1>Decode the <em>Emotion</em><br>Behind Every Tweet</h1>
+      <p>Real-time sentiment analysis using Natural Language Processing. Understand what people truly feel about any topic.</p>
+    </div>
+
+    <!-- Input Panel -->
+    <div class="input-panel">
+      <span class="input-label">📌 Choose a trending topic</span>
+      <div class="topics">
+        {% for topic in topics %}
+        <button class="topic-pill" onclick="selectTopic('{{ topic }}')">
+          #{{ topic }}
+        </button>
+        {% endfor %}
+      </div>
+
+      <div class="divider">or enter your own text</div>
+
+      <div class="custom-area">
+        <textarea id="customText" placeholder="Paste tweets or any text here... (one per line for multiple)"></textarea>
+        <p class="hint">💡 Enter one tweet per line to analyze multiple at once</p>
+      </div>
+
+      <button class="btn-analyze" onclick="runAnalysis()" id="analyzeBtn">
+        Analyze Sentiment
+      </button>
+    </div>
+
+    <!-- Results -->
+    <div id="results">
+
+      <!-- Summary Cards -->
+      <div class="summary-grid">
+        <div class="stat-card positive">
+          <div class="stat-value" id="posCount">0</div>
+          <div class="stat-label">Positive</div>
+        </div>
+        <div class="stat-card negative">
+          <div class="stat-value" id="negCount">0</div>
+          <div class="stat-label">Negative</div>
+        </div>
+        <div class="stat-card neutral">
+          <div class="stat-value" id="neuCount">0</div>
+          <div class="stat-label">Neutral</div>
+        </div>
+        <div class="stat-card overall">
+          <div class="stat-value" id="overallLabel">—</div>
+          <div class="stat-label">Overall Mood</div>
+        </div>
+      </div>
+
+      <!-- Bar Chart -->
+      <div class="chart-panel">
+        <div class="chart-title">Sentiment Distribution</div>
+        <div class="bar-row">
+          <span class="bar-label" style="color:var(--positive)">Positive</span>
+          <div class="bar-track"><div class="bar-fill" id="posBar" style="background:var(--positive)"></div></div>
+          <span class="bar-pct" id="posPct" style="color:var(--positive)">0%</span>
+        </div>
+        <div class="bar-row">
+          <span class="bar-label" style="color:var(--negative)">Negative</span>
+          <div class="bar-track"><div class="bar-fill" id="negBar" style="background:var(--negative)"></div></div>
+          <span class="bar-pct" id="negPct" style="color:var(--negative)">0%</span>
+        </div>
+        <div class="bar-row">
+          <span class="bar-label" style="color:var(--neutral)">Neutral</span>
+          <div class="bar-track"><div class="bar-fill" id="neuBar" style="background:var(--neutral)"></div></div>
+          <span class="bar-pct" id="neuPct" style="color:var(--neutral)">0%</span>
+        </div>
+      </div>
+
+      <!-- Tweet Results -->
+      <div class="tweets-header">
+        <span class="tweets-title">📋 Tweet Analysis</span>
+        <a class="btn-export" href="/export" target="_blank">⬇ Export CSV</a>
+      </div>
+
+      <div class="filter-tabs">
+        <button class="filter-tab active" onclick="filterTweets('All', this)">All</button>
+        <button class="filter-tab" onclick="filterTweets('Positive', this)">😊 Positive</button>
+        <button class="filter-tab" onclick="filterTweets('Negative', this)">😞 Negative</button>
+        <button class="filter-tab" onclick="filterTweets('Neutral', this)">😐 Neutral</button>
+      </div>
+
+      <div class="tweet-list" id="tweetList"></div>
+    </div>
+  </main>
+
+  <footer>
+    Built with Python · Flask · TextBlob · NLP &nbsp;|&nbsp; SoftGrowTech AI Internship Project
+  </footer>
+
+  <script>
+    let selectedTopic = null;
+    let allResults = [];
+
+    function selectTopic(topic) {
+      selectedTopic = topic;
+      document.getElementById('customText').value = '';
+      document.querySelectorAll('.topic-pill').forEach(p => p.classList.remove('active'));
+      event.target.classList.add('active');
+    }
+
+    async function runAnalysis() {
+      const btn = document.getElementById('analyzeBtn');
+      const customText = document.getElementById('customText').value.trim();
+
+      if (!selectedTopic && !customText) {
+        alert('Please select a topic or enter some text!');
+        return;
+      }
+
+      btn.innerHTML = '<span class="spinner"></span> Analyzing...';
+      btn.classList.add('loading');
+      btn.disabled = true;
+
+      try {
+        const response = await fetch('/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ topic: selectedTopic || '', custom_text: customText })
+        });
+
+        const data = await response.json();
+        allResults = data.results;
+        displayResults(data.results, data.summary);
+      } catch(e) {
+        alert('Error running analysis. Make sure the Flask server is running.');
+      }
+
+      btn.innerHTML = 'Analyze Sentiment';
+      btn.classList.remove('loading');
+      btn.disabled = false;
+    }
+
+    function displayResults(results, summary) {
+      document.getElementById('results').style.display = 'block';
+      document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+      // Stats
+      document.getElementById('posCount').textContent = summary.positive;
+      document.getElementById('negCount').textContent = summary.negative;
+      document.getElementById('neuCount').textContent = summary.neutral;
+      document.getElementById('overallLabel').textContent = summary.overall;
+
+      // Bars (with delay for animation)
+      setTimeout(() => {
+        document.getElementById('posBar').style.width = summary.positive_pct + '%';
+        document.getElementById('negBar').style.width = summary.negative_pct + '%';
+        document.getElementById('neuBar').style.width  = summary.neutral_pct  + '%';
+        document.getElementById('posPct').textContent = summary.positive_pct + '%';
+        document.getElementById('negPct').textContent = summary.negative_pct + '%';
+        document.getElementById('neuPct').textContent = summary.neutral_pct  + '%';
+      }, 100);
+
+      renderTweets(results);
+    }
+
+    function renderTweets(results) {
+      const list = document.getElementById('tweetList');
+      list.innerHTML = '';
+
+      results.forEach((r, i) => {
+        const polarityClass = r.polarity > 0.1 ? 'polarity-pos' : r.polarity < -0.1 ? 'polarity-neg' : 'polarity-neu';
+        const meterColor = r.label === 'Positive' ? 'var(--positive)' : r.label === 'Negative' ? 'var(--negative)' : 'var(--neutral)';
+        const meterWidth = Math.round(Math.abs(r.polarity) * 100);
+
+        const card = document.createElement('div');
+        card.className = `tweet-card ${r.label}`;
+        card.style.animationDelay = (i * 0.04) + 's';
+        card.innerHTML = `
+          <span class="tweet-emoji">${r.emoji}</span>
+          <div class="tweet-content">
+            <div class="tweet-text">${escapeHtml(r.text)}</div>
+            <div class="tweet-meta">
+              <span class="tweet-polarity ${polarityClass}">Polarity: ${r.polarity > 0 ? '+' : ''}${r.polarity}</span>
+              <span>Subjectivity: ${r.subjectivity}</span>
+              <span style="font-weight:600;color:${meterColor}">${r.label}</span>
+            </div>
+          </div>
+          <div class="polarity-meter">
+            <div style="font-size:0.7rem;color:var(--muted)">Score</div>
+            <div style="font-size:0.9rem;font-weight:700;color:${meterColor}">${r.polarity > 0 ? '+' : ''}${r.polarity}</div>
+            <div class="meter-track">
+              <div class="meter-fill" style="width:${meterWidth}%;background:${meterColor}"></div>
+            </div>
+          </div>
+        `;
+        list.appendChild(card);
+      });
+    }
+
+    function filterTweets(label, btn) {
+      document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+      btn.classList.add('active');
+
+      const filtered = label === 'All' ? allResults : allResults.filter(r => r.label === label);
+      renderTweets(filtered);
+    }
+
+    function escapeHtml(text) {
+      return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+  </script>
+</body>
+</html>
